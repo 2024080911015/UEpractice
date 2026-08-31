@@ -6,8 +6,12 @@
 #include "GameFramework/Pawn.h"
 #include "spherePawn.generated.h"
 
+class UInputAction;
+class UInputMappingContext;
+struct FInputActionValue;
 class UStaticMeshComponent;
 class UFloatingPawnMovement;
+
 
 UCLASS()
 class UEPRACTICE_API AspherePawn : public APawn
@@ -21,6 +25,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	void Move(const FInputActionValue& Value);
 
 public:	
 	// Called every frame
@@ -35,6 +40,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	UFloatingPawnMovement* MovementComponent;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputAction* MoveAction;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	UInputMappingContext* MappingContext;
 
 
 
