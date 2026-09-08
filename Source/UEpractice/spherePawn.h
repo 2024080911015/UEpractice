@@ -10,9 +10,9 @@ class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
 class UStaticMeshComponent;
-class UFloatingPawnMovement;
 class USpringArmComponent;
 class UCameraComponent;
+class USceneComponent;
 
 
 
@@ -24,7 +24,6 @@ class UEPRACTICE_API AspherePawn : public APawn
 public:
 	// Sets default values for this pawn's properties
 	AspherePawn();
-	virtual void Tick(float DeltaTime) override;
 
 protected:
 	// Called when the game starts or when spawned
@@ -41,8 +40,6 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	UStaticMeshComponent* SphereMesh;
 
-	UPROPERTY(VisibleAnywhere)
-	UFloatingPawnMovement* MovementComponent;
 
 	UPROPERTY(VisibleAnywhere)
 	USpringArmComponent* CameraBoom;
@@ -59,11 +56,6 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	UInputAction* LookAction;
 
-	// 重力
-	float VerticalVelocity = 0.0f;
-	float GravityAcceleration = -980.0f;
-
-	
-
-
+	UPROPERTY(EditAnywhere, Category = "Components")
+	USceneComponent* CameraRoot;
 };

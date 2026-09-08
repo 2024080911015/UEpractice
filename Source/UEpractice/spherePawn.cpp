@@ -3,29 +3,34 @@
 
 #include "spherePawn.h"
 #include "Components/StaticMeshComponent.h"
-#include "GameFramework/FloatingPawnMovement.h"
 #include "EnhancedInputComponent.h"
 #include "InputActionValue.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/Engine.h"
+#include "Components/SceneComponent.h"
 
 // Sets default values
 AspherePawn::AspherePawn()
 {
  	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	//创建球体网格组件
 	SphereMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SphereMesh"));
 	//把球的mesh设置为根组件
 	RootComponent = SphereMesh;
-	//创建pawn的移动组件
-	MovementComponent = CreateDefaultSubobject<UFloatingPawnMovement>(TEXT("MovementComponent"));
-	MovementComponent->SetUpdatedComponent(SphereMesh);
+	SphereMesh->SetSimulatePhysics(true);
+	SphereMesh->SetEnableGravity(true);
+	//增加阻尼以及抑制线速度
+	SphereMesh->SetAngularDamping(2.0f);
+	SphereMesh->SetLinearDamping(0.3f);
 	//创建弹簧臂：相机的"杆子"，挂在球体网格下面
+	CameraRoot = CreateDefaultSubobject<USceneComponent>(TEXT("CameraRoot"));
+	CameraRoot->SetupAttachment(SphereMesh);
+	CameraRoot->SetUsingAbsoluteRotation(true);
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(SphereMesh);
+	CameraBoom->SetupAttachment(CameraRoot);
 	//固定斜俯视角：向下俯视45度，杆长600（先固定，下一步做鼠标转视角时再改）
 	CameraBoom->TargetArmLength = 600.f;
 	CameraBoom->bUsePawnControlRotation = true;
@@ -56,28 +61,7 @@ void AspherePawn::BeginPlay()
 	
 }
 
-// Called every frame
-void AspherePawn::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
 
-	//计算重力作用
-	VerticalVelocity += GravityAcceleration * DeltaTime;
-
-	FVector GravityMovement = FVector(0.f, 0.f, VerticalVelocity * DeltaTime);	
-
-	FHitResult Hit;
-
-	AddActorWorldOffset(
-		GravityMovement, true, &Hit
-	);
-	if (Hit.IsValidBlockingHit() && VerticalVelocity < 0.f)
-	{
-		VerticalVelocity = 0.f;
-	}
-
-
-}
 
 // Called to bind functionality to input
 void AspherePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -99,25 +83,54 @@ void AspherePawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 
 void AspherePawn::Move(const FInputActionValue& Value)
 {
-	FVector2D MovementVector = Value.Get<FVector2D>();
-	if (!Controller) {
+	const FVector2D MovementVector = Value.Get<FVector2D>();
+
+	if (!Controller || !SphereMesh)
+	{
 		return;
 	}
-	//获取当前相机朝向
+
+	// 获取镜头水平方向
 	const FRotator ControlRotation = Controller->GetControlRotation();
-	// 只保留 Yaw，不考虑上下看的 Pitch
+
 	const FRotator YawRotation(
 		0.0f,
 		ControlRotation.Yaw,
 		0.0f
 	);
-	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-	//输入到映射镜头方向
-	AddMovementInput(ForwardDirection, MovementVector.Y);
-	AddMovementInput(RightDirection, MovementVector.X);
-	
+	const FVector ForwardDirection =
+		FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+	const FVector RightDirection =
+		FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	// 玩家希望球移动的方向
+	FVector MoveDirection =
+		ForwardDirection * MovementVector.Y +
+		RightDirection * MovementVector.X;
+
+	if (MoveDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	MoveDirection.Normalize();
+
+	// 球要朝某方向滚动，旋转轴应该与移动方向垂直
+	const FVector TorqueAxis =
+		FVector::CrossProduct(
+			FVector::UpVector,
+			MoveDirection
+		);
+
+	const float TorqueStrength = 15.0f;
+
+	SphereMesh->AddTorqueInRadians(
+		TorqueAxis * TorqueStrength,
+		NAME_None,
+		true
+	);
 }
 
 void AspherePawn::Look(const FInputActionValue& Value)
